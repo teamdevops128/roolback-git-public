@@ -1,0 +1,11 @@
+Repository,User,Role
+Migration-data,vasudev915,read
+Migration-data,rudravasu2021,write
+Migration-data,teamdevops128,admin
+Migration-data,teamsdevops3,write
+Migration-data,njdevopsk8s,write
+Migration2-teamdevops128-Goku,vasudev915,read
+Migration2-teamdevops128-Goku,rudravasu2021,write
+Migration2-teamdevops128-Goku,teamdevops128,admin
+Migration2-teamdevops128-Goku,teamsdevops3,admin
+Migration2-teamdevops128-Goku,njdevopsk8s,admin
