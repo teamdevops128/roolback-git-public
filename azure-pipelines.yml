@@ -1,0 +1,58 @@
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- script: |
+    #!/bin/bash
+
+      log_message() {
+      message=$1
+
+      # Check if the message is different from the previous one
+      if [ "$message" != "$previous_message" ]; then
+        echo $message
+        echo $message >> $LOG_CSV_FILE
+        previous_message=$message
+      fi
+    }
+
+    git branch | grep "*"
+    ORG="sdevops713"
+    CSV_FILE="user_permissions_update.csv"
+    LOG_CSV_FILE="log_messages.csv"
+
+    # Redirect output to CSV file
+    exec > >(tee -a >(cat >> $LOG_CSV_FILE))
+
+    header_printed=false  # Variable to track if the header has been printed
+    previous_message=""   # Variable to store the previous log message
+
+    tail -n +2 "$CSV_FILE" | while IFS=, read -r REPO USER NEW_ROLE; do
+      # Print the header if it hasn't been printed yet
+      if [ "$header_printed" = false ]; then
+        log_message "Repository,User,Role"
+        header_printed=true
+      fi
+
+      # Formulate the log message
+      log_msg="Updating role for user '$USER' in repository '$REPO' to '$NEW_ROLE'."
+
+      # Print current repository, user, and new role
+      log_message "$log_msg"
+
+      # Execute the curl command to update the user's role in the repository
+      curl -s -X PUT -H "Authorization: token $(TOKEN)" -H "Accept: application/vnd.github.v3+json" \
+        "https://api.github.com/repos/$ORG/$REPO/collaborators/$USER" \
+        -d "{\"permission\":\"$NEW_ROLE\"}"
+    done
+
+
+- task: PublishPipelineArtifact@1
+  inputs:
+    targetPath: '$(System.DefaultWorkingDirectory)/log_messages.csv'
+    artifact: 'myArtifacts'
+    publishLocation: pipeline
+  displayName: 'Publish Artifacts'
