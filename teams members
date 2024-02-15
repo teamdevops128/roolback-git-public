@@ -1,29 +1,15 @@
 #!/bin/bash
 
-# GitHub organization name
-ORG_NAME="your_organization_name"
 
-# GitHub personal access token with necessary permissions
-# Ensure this token has the 'read:org' scope
-TOKEN="your_personal_access_token"
-
-# CSV file to store user details
+ORG_NAME=""
 CSV_FILE="team_users.csv"
-
-# Ensure CSV file starts with a header
 echo "Team,Username,Role" > "$CSV_FILE"
-
-# Fetch all teams within the organization
 TEAMS=$(curl -s -H "Authorization: token $TOKEN" "https://api.github.com/orgs/$ORG_NAME/teams" | jq -r '.[].name')
-
-# Loop through each team
 for TEAM in $TEAMS; do
     echo "Processing team: $TEAM"
     
-    # Fetch members of the team
     TEAM_MEMBERS=$(curl -s -H "Authorization: token $TOKEN" "https://api.github.com/orgs/$ORG_NAME/teams/$TEAM/members" | jq -r '.[].login')
     
-    # Loop through each member
     for MEMBER in $TEAM_MEMBERS; do
         # Fetch role of the member within the team
         ROLE=$(curl -s -H "Authorization: token $TOKEN" "https://api.github.com/orgs/$ORG_NAME/teams/$TEAM/memberships/$MEMBER" | jq -r '.role')
