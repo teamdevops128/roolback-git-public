@@ -1,0 +1,45 @@
+
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- script: |
+    #!/bin/bash
+
+    ORG_NAME="sdevops713"
+    EXCEPT_USER="user_to_keep"
+    CSV_FILE="removed_users.csv"
+    echo "Repository,Removed User" > "$CSV_FILE"
+    # List all repositories in the organization
+    REPOS=$(curl -s -H "Authorization: token $(TOKEN)" "https://api.github.com/orgs/$ORG_NAME/repos" | jq -r '.[].name')
+
+    # Loop through each repository
+    for REPO in $REPOS; do
+        echo "Processing repository: $REPO"
+        
+        # List collaborators of the repository
+        COLLABORATORS=$(curl -s -H "Authorization: token $(TOKEN)" "https://api.github.com/repos/$ORG_NAME/$REPO/collaborators" | jq -r '.[].login')
+
+        # Loop through each collaborator
+        for COLLABORATOR in $COLLABORATORS; do
+            # Check if the collaborator is not the user to keep
+            if [ "$COLLABORATOR" != "$EXCEPT_USER" ]; then
+                # Remove the collaborator
+                echo "Removing user: $COLLABORATOR"
+                curl -X DELETE -s -H "Authorization: token $(TOKEN)" "https://api.github.com/repos/$ORG_NAME/$REPO/collaborators/$COLLABORATOR"
+                echo "$REPO,$COLLABORATOR" >> "$CSV_FILE"
+            fi
+        done
+    done
+
+    echo "Done!"
+
+- task: PublishPipelineArtifact@1
+  inputs:
+    targetPath: '$(System.DefaultWorkingDirectory)/removed_users.csv'
+    artifact: 'myArtifacts'
+    publishLocation: pipeline
+  displayName: 'Publish Artifacts'
