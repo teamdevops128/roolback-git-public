@@ -1,0 +1,25 @@
+#!/bin/bash
+
+ORG_NAME="Somatus"
+CSV_FILE="team_association.csv"
+fetch_repos_for_team() {
+    local team="$1"
+    local repos=$(curl -s -H "Authorization: token $TOKEN" "https://api.github.com/orgs/$ORG_NAME/teams/$team/repos" | jq -r '.[].full_name')
+    for repo in $repos; do
+        echo "$team,$repo" >> "$CSV_FILE"
+    done
+}
+
+# Main function
+main() {
+    echo "Team,Repo" > "$CSV_FILE"
+    local teams=$(curl -s -H "Authorization: token $TOKEN" "https://api.github.com/orgs/$ORG_NAME/teams" | jq -r '.[].name')
+    for team in $teams; do
+        echo "Processing team: $team"
+        fetch_repos_for_team "$team"
+    done
+}
+
+main
+
+echo "Done! Team details with associated repositories are saved in $CSV_FILE"
