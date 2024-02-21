@@ -6,17 +6,13 @@ CSV_FILE="removed_users.csv"
 REPO_CSV_FILE="repositories.csv" # CSV file containing repository names
 echo "Repository,Removed User" > "$CSV_FILE"
 
-# Read repositories from CSV file
 IFS=,
 while read -r REPO || [[ -n "$REPO" ]]; do
     echo "Processing repository: $REPO"
 
-    # List collaborators of the repository
     COLLABORATORS=$(curl -s -H "Authorization: token $(TOKEN)" "https://api.github.com/repos/$ORG_NAME/$REPO/collaborators" | jq -r '.[].login')
 
-    # Loop through each collaborator
     for COLLABORATOR in $COLLABORATORS; do
-        # Check if the collaborator is not the user to keep
         if [ "$COLLABORATOR" != "$EXCEPT_USER" ]; then
             # Remove the collaborator
             echo "Removing user: $COLLABORATOR"
