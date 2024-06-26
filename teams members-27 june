@@ -1,0 +1,80 @@
+#!/bin/bash
+
+# GitHub personal access token
+GITHUB_TOKEN="your_github_token"
+
+# Organization name
+ORG_NAME="your_org_name"
+
+# Output CSV file
+OUTPUT_FILE="admins.csv"
+
+# Check if jq is installed
+if ! command -v jq &> /dev/null
+then
+    echo "jq could not be found. Please install jq to run this script."
+    exit
+fi
+
+# Function to fetch data from GitHub API
+fetch_data() {
+  local url=$1
+  curl -s -H "Authorization: token $GITHUB_TOKEN" "$url"
+}
+
+# Function to fetch all pages of repository data
+fetch_all_repos() {
+  local page=1
+  local per_page=100
+  local repos=()
+
+  while :; do
+    response=$(fetch_data "https://api.github.com/orgs/${ORG_NAME}/repos?per_page=${per_page}&page=${page}")
+    if [[ $? -ne 0 ]]; then
+      echo "Error fetching repositories" >&2
+      return 1
+    fi
+
+    repo_names=$(echo "$response" | jq -r '.[].full_name')
+
+    if [[ -z "$repo_names" ]]; then
+      break
+    fi
+
+    repos+=($repo_names)
+    ((page++))
+  done
+
+  echo "${repos[@]}"
+}
+
+# Function to get repository collaborators with admin permissions
+get_admins() {
+  local OWNER_REPO=$1
+  local OWNER=$(echo $OWNER_REPO | cut -d'/' -f1)
+  local REPO=$(echo $OWNER_REPO | cut -d'/' -f2)
+  
+  curl -s -H "Authorization: token $GITHUB_TOKEN" \
+    "https://api.github.com/repos/$OWNER/$REPO/collaborators" | \
+    jq -r --arg repo "$REPO" '.[] | select(.permissions.admin == true) | [$repo, .login, .html_url] | @csv'
+}
+
+# Write CSV header
+echo "repository,username,url" > "$OUTPUT_FILE"
+
+# Fetch all repositories for the organization
+repos=$(fetch_all_repos)
+
+# Check if fetching repositories was successful
+if [[ $? -ne 0 ]]; then
+  echo "Failed to fetch repositories. Exiting."
+  exit 1
+fi
+
+# Iterate over each repository and get admins
+for REPO in $repos; do
+  get_admins "$REPO" >> "$OUTPUT_FILE"
+done
+
+# Print message
+echo "Admins for the repositories in organization $ORG_NAME have been saved to $OUTPUT_FILE."
