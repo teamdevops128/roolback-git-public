@@ -20,9 +20,10 @@ steps:
     # Function to get admin collaborators for a repository
     get_admins() {
       local repo=$1
+      local page=$2
       curl -s -H "Authorization: token $TOKEN" \
-        "https://api.github.com/repos/$ORG/$repo/collaborators?per_page=100" | \
-        jq -r '.[] | select(.permissions.admin == true) | [.login, .html_url] | @csv'
+        "https://api.github.com/repos/$ORG/$repo/collaborators?per_page=100&page=$page" | \
+        jq -r --arg repo "$repo" '.[] | select(.permissions.admin == true) | [$repo, .login, .html_url] | @csv'
     }
 
     # Check if jq is installed
@@ -46,11 +47,19 @@ steps:
     done
 
     # Fetch admin collaborators for each repository and save to CSV
-    echo "username,url" > "$OUTPUT_FILE"
+    echo "repo,username,url" > "$OUTPUT_FILE"
     for repo in "${repos[@]}"
     do
       echo "Processing repository $repo..."
-      get_admins "$repo" >> "$OUTPUT_FILE"
+      admin_page=1
+      while : ; do
+        admins=$(get_admins "$repo" $admin_page)
+        if [ -z "$admins" ]; then
+          break
+        fi
+        echo "$admins" >> "$OUTPUT_FILE"
+        admin_page=$((admin_page + 1))
+      done
     done
 
     echo "Admins for all repositories in $ORG have been saved to $OUTPUT_FILE."
