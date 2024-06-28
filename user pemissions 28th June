@@ -1,0 +1,62 @@
+trigger:
+- none
+pool:
+  name: aks-agent-pool
+steps:
+- script: |
+    #!/bin/bash
+    ORG="c"
+    PER_PAGE=100
+    OUTPUT_FILE="admins.csv"
+    TOKEN="<your_github_token>"  # Set your GitHub token here
+    
+    # Function to fetch a page of repositories
+    fetch_repos_page() {
+      local page=$1
+      curl -s -H "Authorization: token $TOKEN" \
+        "https://api.github.com/orgs/$ORG/repos?per_page=$PER_PAGE&page=$page" | jq -r '.[].name'
+    }
+
+    # Function to get admin collaborators for a repository
+    get_admins() {
+      local repo=$1
+      curl -s -H "Authorization: token $TOKEN" \
+        "https://api.github.com/repos/$ORG/$repo/collaborators?per_page=100" | \
+        jq -r '.[] | select(.permissions.admin == true) | [.login, .html_url] | @csv'
+    }
+
+    # Check if jq is installed
+    if ! command -v jq &> /dev/null
+    then
+        echo "jq could not be found. Please install jq to run this script."
+        exit 1
+    fi
+
+    # Get the list of all repositories dynamically
+    echo "Fetching all repositories from the organization $ORG..."
+    repos=()
+    page=1
+    while : ; do
+      repos_page=($(fetch_repos_page $page))
+      if [ ${#repos_page[@]} -eq 0 ]; then
+        break
+      fi
+      repos+=("${repos_page[@]}")
+      page=$((page + 1))
+    done
+
+    # Fetch admin collaborators for each repository and save to CSV
+    echo "username,url" > "$OUTPUT_FILE"
+    for repo in "${repos[@]}"
+    do
+      echo "Processing repository $repo..."
+      get_admins "$repo" >> "$OUTPUT_FILE"
+    done
+
+    echo "Admins for all repositories in $ORG have been saved to $OUTPUT_FILE."
+- task: PublishPipelineArtifact@1
+  inputs:
+    targetPath: '$(System.DefaultWorkingDirectory)/admins.csv'
+    artifact: 'myArtifacts'
+    publishLocation: pipeline
+  displayName: 'Publish Artifacts'
