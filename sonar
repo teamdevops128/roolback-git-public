@@ -1,0 +1,34 @@
+steps:
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    version: '5.x'
+    installationPath: $(Agent.ToolsDirectory)/dotnet
+
+- script: |
+    dotnet build
+  displayName: 'Build project'
+
+- task: SonarCloudPrepare@1
+  inputs:
+    SonarCloud: 'your-sonarcloud-service-connection'
+    organization: $(SONAR_ORGANIZATION)
+    scannerMode: 'CLI'
+    configMode: 'manual'
+    cliProjectKey: $(SONAR_PROJECT_KEY)
+    cliSources: '.'
+    extraProperties: |
+      sonar.exclusions=**/test/**
+      sonar.cs.opencover.reportsPaths=$(Agent.TempDirectory)/**/coverage.opencover.xml
+
+- task: DotNetCoreCLI@2
+  inputs:
+    command: 'test'
+    projects: '**/*Tests/*.csproj'
+    arguments: '--collect:"Code Coverage"'
+
+- task: SonarCloudAnalyze@1
+
+- task: SonarCloudPublish@1
+  inputs:
+    pollingTimeoutSec: '300'
